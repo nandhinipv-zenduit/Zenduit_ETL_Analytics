@@ -31,4 +31,4 @@ jobs:
           ZOHO_CLIENT_SECRET_UNI: ${{ secrets.ZOHO_CLIENT_SECRET_UNI }}
           ZOHO_REFRESH_TOKEN_UNI: ${{ secrets.ZOHO_REFRESH_TOKEN_UNI }}
 
-        run: python zenduit_sync.py
+        run: python main.py
