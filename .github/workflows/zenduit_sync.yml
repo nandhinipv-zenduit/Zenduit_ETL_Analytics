@@ -1,0 +1,34 @@
+name: Zenduit Sync
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # daily 5 AM UTC
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Zenduit Sync
+        env:
+          ZENDU_EMAIL: ${{ secrets.ZENDU_EMAIL }}
+          ZENDU_PASSWORD: ${{ secrets.ZENDU_PASSWORD }}
+
+          ZOHO_CLIENT_ID_UNI: ${{ secrets.ZOHO_CLIENT_ID_UNI }}
+          ZOHO_CLIENT_SECRET_UNI: ${{ secrets.ZOHO_CLIENT_SECRET_UNI }}
+          ZOHO_REFRESH_TOKEN_UNI: ${{ secrets.ZOHO_REFRESH_TOKEN_UNI }}
+
+        run: python zenduit_sync.py
