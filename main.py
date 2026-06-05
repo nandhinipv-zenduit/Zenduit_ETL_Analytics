@@ -362,17 +362,31 @@ def main():
 # REQUIRED COLUMNS
 # ------------------------------------------------------
 
-# Keep ALL device fields
-    df_device_clean = df_device.copy()
+# ------------------------------------------------------
+# REQUIRED COLUMNS
+# ------------------------------------------------------
+
+    df_device_clean = df_device[[
+        "Id",
+        "CompanyId",
+        "Type",
+        "serial_number",
+        "DevicePlan",
+        "BillingPlan",
+        "DataUsage",
+        "SIM",
+        "SIMType",
+        "ActivationDate",
+        "LastCameraContact",
+        "TerminationDate",
+        "IsSuspend_device"
+    ]].copy()
     
-    # Keep ALL company fields
-    df_company_clean = df_company.copy()
+    df_company_clean = df_company[[
+        "Id",
+        "ZohoAccountId"
+    ]].copy()
     
-    # Add derived fields
-    df_device_clean["serial_number"] = df_device["serial_number"]
-    df_device_clean["IsSuspend_device"] = df_device["IsSuspend_device"]
-    
-    # Rename only the fields used later in the script
     df_device_clean.rename(
         columns={
             "Id": "Device_Id",
