@@ -306,7 +306,8 @@ def main():
     )
 
     # ------------------------------------------------------
-    # SUSPEND STATUS
+    # PRESERVE RAW STATUS STRING — must happen first
+    # before bfill mutates anything
     # ------------------------------------------------------
     suspend_cols = [
         "IsSuspend",
@@ -316,6 +317,20 @@ def main():
         "Status"
     ]
 
+    status_col = next(
+        (c for c in suspend_cols if c in df_device.columns),
+        None
+    )
+
+    df_device["Device_Status"] = (
+        df_device[status_col].copy()
+        if status_col
+        else None
+    )
+
+    # ------------------------------------------------------
+    # SUSPEND STATUS
+    # ------------------------------------------------------
     existing_cols = [
         c for c in suspend_cols
         if c in df_device.columns
@@ -333,20 +348,6 @@ def main():
 
     else:
         df_device["IsSuspend_device"] = None
-
-    # ------------------------------------------------------
-    # PRESERVE RAW STATUS STRING
-    # ------------------------------------------------------
-    status_col = next(
-        (c for c in suspend_cols if c in df_device.columns),
-        None
-    )
-
-    df_device["Device_Status"] = (
-        df_device[status_col]
-        if status_col
-        else None
-    )
 
     # ------------------------------------------------------
     # NORMALIZE IS_SUSPENDED BOOLEAN
