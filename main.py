@@ -37,6 +37,7 @@ OUTPUT_FILE = (
 
 ZOHO_MAX_BYTES_PER_IMPORT = 14 * 1024 * 1024
 
+
 # ==========================================================
 # AUTHENTICATE
 # ==========================================================
@@ -333,6 +334,23 @@ def main():
     else:
         df_device["IsSuspend_device"] = None
 
+    # ------------------------------------------------------
+    # PRESERVE RAW STATUS STRING
+    # ------------------------------------------------------
+    status_col = next(
+        (c for c in suspend_cols if c in df_device.columns),
+        None
+    )
+
+    df_device["Device_Status"] = (
+        df_device[status_col]
+        if status_col
+        else None
+    )
+
+    # ------------------------------------------------------
+    # NORMALIZE IS_SUSPENDED BOOLEAN
+    # ------------------------------------------------------
     df_device["IsSuspend_device"] = (
         df_device["IsSuspend_device"]
         .apply(
@@ -355,10 +373,9 @@ def main():
         )
     )
 
-  # ------------------------------------------------------
-# REQUIRED COLUMNS
-# ------------------------------------------------------
-
+    # ------------------------------------------------------
+    # REQUIRED COLUMNS
+    # ------------------------------------------------------
     df_device_clean = df_device[[
         "Id",
         "CompanyId",
@@ -372,14 +389,15 @@ def main():
         "ActivationDate",
         "LastCameraContact",
         "TerminationDate",
-        "IsSuspend_device"
+        "IsSuspend_device",
+        "Device_Status"
     ]].copy()
-    
+
     df_company_clean = df_company[[
         "Id",
         "ZohoAccountId"
     ]].copy()
-    
+
     df_device_clean.rename(
         columns={
             "Id": "Device_Id",
@@ -391,11 +409,13 @@ def main():
             "SimType": "SIM_Type",
             "ActivationDate": "Activation_Date",
             "LastCameraContact": "Last_active",
-            "TerminationDate": "Termination_date"
+            "TerminationDate": "Termination_date",
+            "IsSuspend_device": "Is_Suspended",
+            "Device_Status": "Status"
         },
         inplace=True
     )
-    
+
     df_company_clean.rename(
         columns={
             "Id": "CompanyId",
@@ -474,8 +494,6 @@ def main():
         )
 
     Final_df = Final_df.fillna("")
-
-
 
     # ------------------------------------------------------
     # ZOHO UPLOAD
