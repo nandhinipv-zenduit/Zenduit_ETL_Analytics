@@ -355,14 +355,7 @@ def main():
         )
     )
 
-    # ------------------------------------------------------
-    # REQUIRED COLUMNS
-    # ------------------------------------------------------
   # ------------------------------------------------------
-# REQUIRED COLUMNS
-# ------------------------------------------------------
-
-# ------------------------------------------------------
 # REQUIRED COLUMNS
 # ------------------------------------------------------
 
@@ -372,10 +365,10 @@ def main():
         "Type",
         "serial_number",
         "DevicePlan",
-        "BillingPlan",
-        "DataUsage",
-        "SIM",
-        "SIMType",
+        "DataPlan",
+        "DataUsageStatus",
+        "ICCID",
+        "SimType",
         "ActivationDate",
         "LastCameraContact",
         "TerminationDate",
@@ -392,6 +385,11 @@ def main():
             "Id": "Device_Id",
             "Type": "Tracker_type",
             "DevicePlan": "Plan",
+            "DataPlan": "Billing_Plan",
+            "DataUsageStatus": "Data_Usage",
+            "ICCID": "SIM",
+            "SimType": "SIM_Type",
+            "ActivationDate": "Activation_Date",
             "LastCameraContact": "Last_active",
             "TerminationDate": "Termination_date"
         },
