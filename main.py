@@ -306,38 +306,22 @@ def main():
     )
 
     # ------------------------------------------------------
-    # PRESERVE RAW STATUS STRING — must happen first
-    # before bfill mutates anything
+    # IS_SUSPENDED BOOLEAN (device-level boolean fields only)
+    # Status string is on Company — handled below
     # ------------------------------------------------------
     suspend_cols = [
         "IsSuspend",
         "IsSuspended",
         "DeviceStatus__IsSuspend",
         "DeviceStatus__IsSuspended",
-        "Status"
     ]
 
-    status_col = next(
-        (c for c in suspend_cols if c in df_device.columns),
-        None
-    )
-
-    df_device["Device_Status"] = (
-        df_device[status_col].copy()
-        if status_col
-        else None
-    )
-
-    # ------------------------------------------------------
-    # SUSPEND STATUS
-    # ------------------------------------------------------
     existing_cols = [
         c for c in suspend_cols
         if c in df_device.columns
     ]
 
     if existing_cols:
-
         df_device["IsSuspend_device"] = (
             df_device[existing_cols]
             .astype(str)
@@ -345,37 +329,23 @@ def main():
             .bfill(axis=1)
             .iloc[:, 0]
         )
-
     else:
         df_device["IsSuspend_device"] = None
 
-    # ------------------------------------------------------
-    # NORMALIZE IS_SUSPENDED BOOLEAN
-    # ------------------------------------------------------
     df_device["IsSuspend_device"] = (
         df_device["IsSuspend_device"]
         .apply(
             lambda x:
             True
-            if str(x).lower() in [
-                "true",
-                "1",
-                "yes",
-                "suspended"
-            ]
+            if str(x).lower() in ["true", "1", "yes", "suspended"]
             else False
-            if str(x).lower() in [
-                "false",
-                "0",
-                "no",
-                "active"
-            ]
+            if str(x).lower() in ["false", "0", "no", "active"]
             else None
         )
     )
 
     # ------------------------------------------------------
-    # REQUIRED COLUMNS
+    # DEVICE COLUMNS
     # ------------------------------------------------------
     df_device_clean = df_device[[
         "Id",
@@ -390,13 +360,7 @@ def main():
         "ActivationDate",
         "LastCameraContact",
         "TerminationDate",
-        "IsSuspend_device",
-        "Device_Status"
-    ]].copy()
-
-    df_company_clean = df_company[[
-        "Id",
-        "ZohoAccountId"
+        "IsSuspend_device"
     ]].copy()
 
     df_device_clean.rename(
@@ -411,16 +375,28 @@ def main():
             "ActivationDate": "Activation_Date",
             "LastCameraContact": "Last_active",
             "TerminationDate": "Termination_date",
-            "IsSuspend_device": "Is_Suspended",
-            "Device_Status": "Status"
+            "IsSuspend_device": "Is_Suspended"
         },
         inplace=True
     )
 
+    # ------------------------------------------------------
+    # COMPANY COLUMNS — Status (Active/Inactive) lives here
+    # ------------------------------------------------------
+    company_cols = ["Id", "ZohoAccountId"]
+
+    if "Status" in df_company.columns:
+        company_cols.append("Status")
+    else:
+        print("⚠️  'Status' column not found in Company data — check API response")
+
+    df_company_clean = df_company[company_cols].copy()
+
     df_company_clean.rename(
         columns={
             "Id": "CompanyId",
-            "ZohoAccountId": "AccountId"
+            "ZohoAccountId": "AccountId",
+            "Status": "Status"          # keep the name as-is
         },
         inplace=True
     )
@@ -450,7 +426,7 @@ def main():
     )
 
     # ------------------------------------------------------
-    # MERGE
+    # MERGE — Status joins from Company via CompanyId
     # ------------------------------------------------------
     Final_df = df_device_clean.merge(
         df_company_clean,
@@ -459,10 +435,7 @@ def main():
         suffixes=("", "_company")
     )
 
-    print(
-        f"\n🎯 Final Rows: "
-        f"{len(Final_df):,}"
-    )
+    print(f"\n🎯 Final Rows: {len(Final_df):,}")
 
     # ------------------------------------------------------
     # CLEANUP
@@ -496,17 +469,16 @@ def main():
 
     Final_df = Final_df.fillna("")
 
+    # Debug: confirm Status values look correct before upload
+    if "Status" in Final_df.columns:
+        print(f"\n📊 Status value counts:\n{Final_df['Status'].value_counts()}")
+
     # ------------------------------------------------------
     # ZOHO UPLOAD
     # ------------------------------------------------------
-    access_token = (
-        zoho_get_access_token()
-    )
+    access_token = zoho_get_access_token()
 
-    zoho_truncate_add(
-        Final_df,
-        access_token
-    )
+    zoho_truncate_add(Final_df, access_token)
 
     print(
         f"\n🚀 Uploaded "
