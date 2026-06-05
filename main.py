@@ -419,7 +419,7 @@ def main():
     # ------------------------------------------------------
     # MERGE
     # ------------------------------------------------------
-     Final_df = df_device_clean.merge(
+    Final_df = df_device_clean.merge(
         df_company_clean,
         on="CompanyId",
         how="left",
