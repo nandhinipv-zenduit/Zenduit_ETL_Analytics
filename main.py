@@ -363,34 +363,34 @@ def main():
 # ------------------------------------------------------
 
 # Keep ALL device fields
-df_device_clean = df_device.copy()
-
-# Keep ALL company fields
-df_company_clean = df_company.copy()
-
-# Add derived fields
-df_device_clean["serial_number"] = df_device["serial_number"]
-df_device_clean["IsSuspend_device"] = df_device["IsSuspend_device"]
-
-# Rename only the fields used later in the script
-df_device_clean.rename(
-    columns={
-        "Id": "Device_Id",
-        "Type": "Tracker_type",
-        "DevicePlan": "Plan",
-        "LastCameraContact": "Last_active",
-        "TerminationDate": "Termination_date"
-    },
-    inplace=True
-)
-
-df_company_clean.rename(
-    columns={
-        "Id": "CompanyId",
-        "ZohoAccountId": "AccountId"
-    },
-    inplace=True
-)
+    df_device_clean = df_device.copy()
+    
+    # Keep ALL company fields
+    df_company_clean = df_company.copy()
+    
+    # Add derived fields
+    df_device_clean["serial_number"] = df_device["serial_number"]
+    df_device_clean["IsSuspend_device"] = df_device["IsSuspend_device"]
+    
+    # Rename only the fields used later in the script
+    df_device_clean.rename(
+        columns={
+            "Id": "Device_Id",
+            "Type": "Tracker_type",
+            "DevicePlan": "Plan",
+            "LastCameraContact": "Last_active",
+            "TerminationDate": "Termination_date"
+        },
+        inplace=True
+    )
+    
+    df_company_clean.rename(
+        columns={
+            "Id": "CompanyId",
+            "ZohoAccountId": "AccountId"
+        },
+        inplace=True
+    )
 
     # ------------------------------------------------------
     # LAST ACTIVE
@@ -419,12 +419,12 @@ df_company_clean.rename(
     # ------------------------------------------------------
     # MERGE
     # ------------------------------------------------------
- Final_df = df_device_clean.merge(
-    df_company_clean,
-    on="CompanyId",
-    how="left",
-    suffixes=("", "_company")
-)
+     Final_df = df_device_clean.merge(
+        df_company_clean,
+        on="CompanyId",
+        how="left",
+        suffixes=("", "_company")
+    )
 
     print(
         f"\n🎯 Final Rows: "
