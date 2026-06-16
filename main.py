@@ -25,6 +25,8 @@ ZOHO_ANALYTICS = {
     "api_domain": "https://analyticsapi.zoho.com/restapi/v2",
 }
 
+print(ZOHO_ANALYTICS["refresh_token"])
+
 ZOHO_ORG_ID = "67409019"
 ZOHO_WORKSPACE_ID = "953790000013364003"
 
