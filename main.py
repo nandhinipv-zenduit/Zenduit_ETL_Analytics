@@ -481,7 +481,9 @@ def main():
     access_token = zoho_get_access_token()
 
     zoho_truncate_add(Final_df, access_token)
-    print(ZOHO_ANALYTICS["refresh_token"])
+    print("ZOHO_CLIENT_ID_UNI    :", os.environ.get("ZOHO_CLIENT_ID_UNI"))
+    print("ZOHO_CLIENT_SECRET_UNI:", os.environ.get("ZOHO_CLIENT_SECRET_UNI"))
+    print("ZOHO_REFRESH_TOKEN_UNI:", os.environ.get("ZOHO_REFRESH_TOKEN_UNI"))
     print(
         f"\n🚀 Uploaded "
         f"{len(Final_df):,} rows "
