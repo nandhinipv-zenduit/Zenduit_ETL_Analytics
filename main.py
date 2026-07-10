@@ -304,8 +304,8 @@ def main():
             "Serial", "GlobalstarESN", "SmartwitnessDRID",   # coalesce sources
             "Name", "SurfEdgeSerial", "UpdateDate",          # new report fields
             "BillingTag", "CreationDate",
-            "BillingSKU", "BillingSKUId",
-            "PromoCode",                                     # new
+            "BillingSKU", "BillingSKUId"
+                                    # new
         ],
         "Device",
     )
@@ -390,8 +390,7 @@ def main():
         "BillingTag",        # Billing Plan (report definition)
         "CreationDate",      # Date Created
         "BillingSKU",        # BillingSKU
-        "BillingSKUId",      # BillingSKUID
-        "PromoCode",         # Promo code
+        "BillingSKUId"      # BillingSKUID
     ]].copy()
 
     df_device_clean.rename(
