@@ -14,10 +14,6 @@ PASSWORD = os.getenv("ZENDU_PASSWORD")
 session = requests.Session()
 token = None
 
-OUTPUT_FILE = (
-    r"C:\Users\suppo\PyCharmMiscProject\.venv\Billing_audit_engine\OP\zenduit_Master.xlsx"
-)
-
 # ==========================================================
 # ZOHO ANALYTICS CONFIG
 # ==========================================================
@@ -304,8 +300,7 @@ def main():
             "Serial", "GlobalstarESN", "SmartwitnessDRID",   # coalesce sources
             "Name", "SurfEdgeSerial", "UpdateDate",          # new report fields
             "BillingTag", "CreationDate",
-            "BillingSKU", "BillingSKUId"
-                                    # new
+            "BillingSKU", "BillingSKUId"                                     # new
         ],
         "Device",
     )
@@ -390,7 +385,7 @@ def main():
         "BillingTag",        # Billing Plan (report definition)
         "CreationDate",      # Date Created
         "BillingSKU",        # BillingSKU
-        "BillingSKUId"      # BillingSKUID
+        "BillingSKUId"     # BillingSKUID    # Promo code
     ]].copy()
 
     df_device_clean.rename(
@@ -545,14 +540,6 @@ def main():
     # Debug: confirm Status values look correct
     if "Status" in Final_df.columns:
         print(f"\n📊 Status value counts:\n{Final_df['Status'].value_counts()}")
-
-    # ------------------------------------------------------
-    # OUTPUT TO EXCEL (local audit copy)
-    # ------------------------------------------------------
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    Final_df.to_excel(OUTPUT_FILE, index=False)
-
-    print(f"\n💾 Saved {len(Final_df):,} rows -> {OUTPUT_FILE}")
 
     # ------------------------------------------------------
     # LOAD -> ZOHO ANALYTICS (truncate + chunked append)
