@@ -300,7 +300,7 @@ def main():
             "Serial", "GlobalstarESN", "SmartwitnessDRID",   # coalesce sources
             "Name", "SurfEdgeSerial", "UpdateDate",          # new report fields
             "BillingTag", "CreationDate",
-            "BillingSKU", "BillingSKUId"                                     # new
+            "BillingSKU", "BillingSKUId","TrackerType"                                    # new
         ],
         "Device",
     )
@@ -365,7 +365,7 @@ def main():
         # ----- existing -----
         "Id",
         "CompanyId",
-        "Type",
+        "TrackerType",
         "serial_number",
         "DevicePlan",
         "DataPlan",
@@ -392,7 +392,7 @@ def main():
         columns={
             # ----- existing renames (unchanged) -----
             "Id": "Device_Id",
-            "Type": "Tracker_type",
+            "TrackerType": "Tracker_type",
             "DevicePlan": "Plan",
             "DataPlan": "Data_Plan",
             "DataUsageStatus": "Data_Usage",
