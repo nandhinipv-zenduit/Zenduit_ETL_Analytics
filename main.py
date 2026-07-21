@@ -93,6 +93,20 @@ def fetch_devices():
         f"✔ Total Devices: {len(df):,} "
         f"| Columns: {len(df.columns):,}"
     )
+
+    # ------------------------------------------------------
+    # DIAGNOSTIC: show every column that looks billing/plan/SKU
+    # related, with how many rows are actually populated. This
+    # tells us which field really holds the "Billing Plan".
+    # ------------------------------------------------------
+    billing_like = [
+        c for c in df.columns
+        if any(k in c.lower() for k in ("bill", "sku", "plan"))
+    ]
+    print("\n🔎 Billing/plan-related columns (non-null counts):")
+    for c in billing_like:
+        print(f"   • {c}: {df[c].notna().sum():,} populated")
+
     return df
 
 
@@ -266,9 +280,44 @@ def main():
             "BillingTag", "CreationDate",
             "BillingSKU", "BillingSKUId", "Type",
             "Odometer", "EngineHours", "GroupId",            # new (odometer/engine hours/group)
+            # ---- billing-plan candidate sources (coalesced below) ----
+            "BillingPlan", "BillingPlanName", "BillingPlanTag",
+            "BillingPlan__Name", "BillingSKU__Name",
         ],
         "Device",
     )
+
+    # ------------------------------------------------------
+    # BILLING PLAN (coalesced)
+    # The website "Billing Plan" (e.g. "OPEX ZenCAM PLUS+ENTERPRISE")
+    # is NOT reliably in BillingTag — it can live in any of these
+    # fields depending on the device. Take the first populated one.
+    # Run once and check the fetch_devices() diagnostic output to
+    # confirm which column is actually populated, then you can trim
+    # this list to just that field.
+    # ------------------------------------------------------
+    billing_plan_candidates = [
+        "BillingSKU",         # human-readable SKU (most likely)
+        "BillingPlanName",
+        "BillingPlan__Name",
+        "BillingSKU__Name",
+        "BillingPlan",
+        "BillingPlanTag",
+        "BillingTag",         # original (kept last as fallback)
+    ]
+    billing_present = [
+        c for c in billing_plan_candidates
+        if c in df_device.columns
+    ]
+    if billing_present:
+        df_device["Billing_Plan"] = (
+            df_device[billing_present]
+            .replace("", pd.NA)
+            .bfill(axis=1)
+            .iloc[:, 0]
+        )
+    else:
+        df_device["Billing_Plan"] = None
 
     # ------------------------------------------------------
     # SERIAL NUMBER (existing coalesced field — kept as-is)
@@ -348,7 +397,7 @@ def main():
         "SmartwitnessDRID",  # SW Serial
         "SurfEdgeSerial",    # SS Serial
         "UpdateDate",        # Telematics Communication Date
-        "BillingTag",        # Billing Plan (report definition)
+        "Billing_Plan",      # Billing Plan (coalesced above)
         "CreationDate",      # Date Created
         "BillingSKU",        # BillingSKU
         "BillingSKUId",      # BillingSKUID / Promo code
@@ -374,7 +423,6 @@ def main():
             "IsSuspend_device": "Is_Suspended",
             # ----- only disambiguation for the new field -----
             "Name": "Device_Name",
-            "BillingTag": "Billing_Plan",
             # ----- new -----
             "EngineHours": "Engine_Hours",
         },
