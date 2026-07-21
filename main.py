@@ -93,20 +93,6 @@ def fetch_devices():
         f"✔ Total Devices: {len(df):,} "
         f"| Columns: {len(df.columns):,}"
     )
-
-    # ------------------------------------------------------
-    # DIAGNOSTIC: show every column that looks billing/plan/SKU
-    # related, with how many rows are actually populated. This
-    # tells us which field really holds the "Billing Plan".
-    # ------------------------------------------------------
-    billing_like = [
-        c for c in df.columns
-        if any(k in c.lower() for k in ("bill", "sku", "plan"))
-    ]
-    print("\n🔎 Billing/plan-related columns (non-null counts):")
-    for c in billing_like:
-        print(f"   • {c}: {df[c].notna().sum():,} populated")
-
     return df
 
 
@@ -271,6 +257,8 @@ def main():
     # ------------------------------------------------------
     # Guarantee device fields referenced below exist
     # (existing coalesce fields + new finance-report fields)
+    #   BillingTag -> Billing Plan   (confirmed from API dump)
+    #   HWSKU      -> Billing SKU     (confirmed from API dump)
     # ------------------------------------------------------
     df_device = ensure_columns(
         df_device,
@@ -278,46 +266,33 @@ def main():
             "Serial", "GlobalstarESN", "SmartwitnessDRID",   # coalesce sources
             "Name", "SurfEdgeSerial", "UpdateDate",          # new report fields
             "BillingTag", "CreationDate",
-            "BillingSKU", "BillingSKUId", "Type",
-            "Odometer", "EngineHours", "GroupId",            # new (odometer/engine hours/group)
-            # ---- billing-plan candidate sources (coalesced below) ----
-            "BillingPlan", "BillingPlanName", "BillingPlanTag",
-            "BillingPlan__Name", "BillingSKU__Name",
+            "HWSKU", "BillingSKUId", "Type",                 # HWSKU -> Billing SKU
+            "Odometer", "EngineHours", "GroupsIds",          # odometer/engine hours/groups(list)
         ],
         "Device",
     )
 
     # ------------------------------------------------------
-    # BILLING PLAN (coalesced)
-    # The website "Billing Plan" (e.g. "OPEX ZenCAM PLUS+ENTERPRISE")
-    # is NOT reliably in BillingTag — it can live in any of these
-    # fields depending on the device. Take the first populated one.
-    # Run once and check the fetch_devices() diagnostic output to
-    # confirm which column is actually populated, then you can trim
-    # this list to just that field.
+    # GROUP NAMES (resolve the GroupsIds list -> names)
+    # A device carries a LIST of group ids (GroupsIds), not a
+    # single GroupId. Build an id->name map from /Group/GetAll
+    # and collapse each device's list into one comma-separated
+    # Group_Names cell (keeps one row per device).
     # ------------------------------------------------------
-    billing_plan_candidates = [
-        "BillingSKU",         # human-readable SKU (most likely)
-        "BillingPlanName",
-        "BillingPlan__Name",
-        "BillingSKU__Name",
-        "BillingPlan",
-        "BillingPlanTag",
-        "BillingTag",         # original (kept last as fallback)
-    ]
-    billing_present = [
-        c for c in billing_plan_candidates
-        if c in df_device.columns
-    ]
-    if billing_present:
-        df_device["Billing_Plan"] = (
-            df_device[billing_present]
-            .replace("", pd.NA)
-            .bfill(axis=1)
-            .iloc[:, 0]
-        )
-    else:
-        df_device["Billing_Plan"] = None
+    df_group = ensure_columns(df_group, ["Id", "Name"], "Group")
+    group_map = dict(
+        zip(df_group["Id"].astype(str), df_group["Name"])
+    )
+
+    def _resolve_group_names(ids):
+        if not isinstance(ids, list):
+            return ""
+        names = [group_map.get(str(g), "") for g in ids]
+        return ", ".join(n for n in names if n)
+
+    df_device["Group_Names"] = (
+        df_device["GroupsIds"].apply(_resolve_group_names)
+    )
 
     # ------------------------------------------------------
     # SERIAL NUMBER (existing coalesced field — kept as-is)
@@ -368,13 +343,10 @@ def main():
     # ------------------------------------------------------
     # DEVICE COLUMNS
     #   - Existing columns keep their existing names.
-    #   - Additional finance-report fields appended below
-    #     under their raw API names (only "Name" is
-    #     disambiguated -> "Device_Name" to avoid clashing
-    #     with the Company / Reseller name columns).
-    #   - Odometer / EngineHours / GroupId appended at the end
-    #     (raw API names; EngineHours renamed below, GroupId
-    #     stays raw for the Group_Name join).
+    #   - BillingTag -> Billing_Plan   (renamed below)
+    #   - HWSKU      -> BillingSKU      (renamed below)
+    #   - Only "Name" is disambiguated -> "Device_Name".
+    #   - Odometer / EngineHours / GroupId appended at the end.
     # ------------------------------------------------------
     df_device_clean = df_device[[
         # ----- existing -----
@@ -397,14 +369,14 @@ def main():
         "SmartwitnessDRID",  # SW Serial
         "SurfEdgeSerial",    # SS Serial
         "UpdateDate",        # Telematics Communication Date
-        "Billing_Plan",      # Billing Plan (coalesced above)
+        "BillingTag",        # Billing Plan
         "CreationDate",      # Date Created
-        "BillingSKU",        # BillingSKU
+        "HWSKU",             # Billing SKU
         "BillingSKUId",      # BillingSKUID / Promo code
         # ----- new -----
         "Odometer",
         "EngineHours",
-        "GroupId",
+        "Group_Names",
     ]].copy()
 
     df_device_clean.rename(
@@ -421,8 +393,10 @@ def main():
             "LastCameraContact": "Last_active",
             "TerminationDate": "Termination_date",
             "IsSuspend_device": "Is_Suspended",
-            # ----- only disambiguation for the new field -----
             "Name": "Device_Name",
+            # ----- billing (confirmed field names) -----
+            "BillingTag": "Billing_Plan",
+            "HWSKU": "BillingSKU",
             # ----- new -----
             "EngineHours": "Engine_Hours",
         },
@@ -480,19 +454,6 @@ def main():
     )
 
     # ------------------------------------------------------
-    # GROUP COLUMNS
-    # ------------------------------------------------------
-    df_group = ensure_columns(df_group, ["Id", "Name"], "Group")
-    df_group_clean = df_group[["Id", "Name"]].copy()
-    df_group_clean.rename(
-        columns={
-            "Id": "GroupId",
-            "Name": "Group_Name",
-        },
-        inplace=True
-    )
-
-    # ------------------------------------------------------
     # LAST ACTIVE (existing logic)
     # ------------------------------------------------------
     df_device_clean["Last_active"] = (
@@ -515,8 +476,8 @@ def main():
     )
 
     # ------------------------------------------------------
-    # MERGE — Company via CompanyId, then Reseller via ResellerId,
-    # then Group via GroupId
+    # MERGE — Company via CompanyId, then Reseller via ResellerId.
+    # (Group names already resolved inline into Group_Names.)
     # ------------------------------------------------------
     Final_df = df_device_clean.merge(
         df_company_clean,
@@ -534,13 +495,6 @@ def main():
         )
     else:
         Final_df["Reseller_Name"] = ""
-
-    Final_df = Final_df.merge(
-        df_group_clean,
-        on="GroupId",
-        how="left",
-        suffixes=("", "_group")
-    )
 
     print(f"\n🎯 Final Rows: {len(Final_df):,}")
 
