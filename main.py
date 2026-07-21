@@ -7,7 +7,6 @@ import pandas as pd
 # ZENDUIT CONFIG
 # ==========================================================
 BASE_URL = "https://trax-admin-service.zenduit.com"
-
 USERNAME = os.getenv("ZENDU_EMAIL")
 PASSWORD = os.getenv("ZENDU_PASSWORD")
 
@@ -27,10 +26,8 @@ ZOHO_ANALYTICS = {
 
 ZOHO_ORG_ID = "67409019"
 ZOHO_WORKSPACE_ID = "953790000013364003"
-
 # Zenduit Master table
 ZOHO_VIEW_ID = "953790000054827175"
-
 ZOHO_MAX_BYTES_PER_IMPORT = 14 * 1024 * 1024
 
 
@@ -39,26 +36,19 @@ ZOHO_MAX_BYTES_PER_IMPORT = 14 * 1024 * 1024
 # ==========================================================
 def authenticate():
     global token
-
     url = f"{BASE_URL}/Auth/Authenticate"
-
     payload = {
         "Username": USERNAME,
         "Password": PASSWORD
     }
-
     res = session.post(url, json=payload)
     res.raise_for_status()
-
     token = res.json().get("Token")
-
     if not token:
         raise Exception("Token missing in response")
-
     session.headers.update({
         "Authorization": f"Bearer {token}"
     })
-
     print("🔑 Authentication Success")
 
 
@@ -79,20 +69,13 @@ def _extract_list(data):
 # FETCH COMPANIES
 # ==========================================================
 def fetch_companies():
-
     print("\n🏢 Fetching Companies...")
-
     url = f"{BASE_URL}/Company/GetAll"
-
     res = session.post(url, json={})
     res.raise_for_status()
-
     companies = _extract_list(res.json())
-
     df = pd.json_normalize(companies)
-
     print(f"✔ Total Companies: {len(df):,}")
-
     return df
 
 
@@ -100,23 +83,16 @@ def fetch_companies():
 # FETCH DEVICES
 # ==========================================================
 def fetch_devices():
-
     print("\n📡 Fetching Devices...")
-
     url = f"{BASE_URL}/Device/GetAll"
-
     res = session.post(url, json={})
     res.raise_for_status()
-
     devices = _extract_list(res.json())
-
     df = pd.json_normalize(devices, sep="__")
-
     print(
         f"✔ Total Devices: {len(df):,} "
         f"| Columns: {len(df.columns):,}"
     )
-
     return df
 
 
@@ -126,11 +102,8 @@ def fetch_devices():
 # Adjust the path if your API uses a different route.
 # ==========================================================
 def fetch_resellers():
-
     print("\n🏷️  Fetching Resellers...")
-
     url = f"{BASE_URL}/Reseller/GetAll"
-
     try:
         res = session.post(url, json={})
         res.raise_for_status()
@@ -140,6 +113,26 @@ def fetch_resellers():
         return df
     except Exception as e:
         print(f"⚠️  Could not fetch resellers ({e}) — Reseller_Name will be blank")
+        return pd.DataFrame(columns=["Id", "Name"])
+
+
+# ==========================================================
+# FETCH GROUPS  (needed to resolve GroupId -> Group_Name)
+# NOTE: endpoint assumed to follow the same /GetAll pattern
+# as Reseller/GetAll. Adjust the path if it's different.
+# ==========================================================
+def fetch_groups():
+    print("\n🗂️  Fetching Groups...")
+    url = f"{BASE_URL}/Group/GetAll"
+    try:
+        res = session.post(url, json={})
+        res.raise_for_status()
+        groups = _extract_list(res.json())
+        df = pd.json_normalize(groups)
+        print(f"✔ Total Groups: {len(df):,}")
+        return df
+    except Exception as e:
+        print(f"⚠️  Could not fetch groups ({e}) — Group_Name will be blank")
         return pd.DataFrame(columns=["Id", "Name"])
 
 
@@ -159,7 +152,6 @@ def ensure_columns(df, cols, label):
 # ZOHO ACCESS TOKEN
 # ==========================================================
 def zoho_get_access_token():
-
     r = requests.post(
         f"{ZOHO_ANALYTICS['accounts_url']}/oauth/v2/token",
         data={
@@ -170,14 +162,10 @@ def zoho_get_access_token():
         },
         timeout=30,
     )
-
     r.raise_for_status()
-
     token_data = r.json()
-
     if "access_token" not in token_data:
         raise Exception(f"Failed getting Zoho token: {token_data}")
-
     return token_data["access_token"]
 
 
@@ -185,33 +173,27 @@ def zoho_get_access_token():
 # ZOHO IMPORT (single chunk)
 # ==========================================================
 def _zoho_import_chunk(csv_bytes, import_type, access_token):
-
     url = (
         f"{ZOHO_ANALYTICS['api_domain']}"
         f"/workspaces/{ZOHO_WORKSPACE_ID}"
         f"/views/{ZOHO_VIEW_ID}/data"
     )
-
     config = {
         "importType": import_type,
         "fileType": "csv",
         "autoIdentify": "true",
         "onError": "setcolumnempty",
     }
-
     headers = {
         "Authorization": f"Zoho-oauthtoken {access_token}",
         "ZANALYTICS-ORGID": ZOHO_ORG_ID,
     }
-
     files = {
         "FILE": ("zenduit_master.csv", csv_bytes, "text/csv")
     }
-
     data = {
         "CONFIG": json.dumps(config)
     }
-
     r = requests.post(
         url,
         headers=headers,
@@ -219,14 +201,10 @@ def _zoho_import_chunk(csv_bytes, import_type, access_token):
         files=files,
         timeout=300,
     )
-
     print(f"[{import_type}] Status: {r.status_code}")
-
     if r.status_code != 200:
         print(r.text)
-
     r.raise_for_status()
-
     return r.json()
 
 
@@ -234,48 +212,35 @@ def _zoho_import_chunk(csv_bytes, import_type, access_token):
 # ZOHO TRUNCATE + ADD (chunked to stay under import size cap)
 # ==========================================================
 def zoho_truncate_add(df, access_token):
-
     header_bytes = len(
         df.iloc[0:0].to_csv(index=False).encode("utf-8")
     )
-
     full_bytes = len(
         df.to_csv(index=False).encode("utf-8")
     )
-
     avg_row = max(
         1,
         (full_bytes - header_bytes) // max(1, len(df))
     )
-
     rows_per_chunk = max(
         1,
         (ZOHO_MAX_BYTES_PER_IMPORT - header_bytes) // avg_row
     )
-
     total_rows = len(df)
-
     print(
         f"\nUploading {total_rows:,} rows "
         f"in chunks of {rows_per_chunk:,}"
     )
-
     for i in range(0, total_rows, rows_per_chunk):
-
         chunk = df.iloc[i:i + rows_per_chunk]
-
         csv_bytes = chunk.to_csv(index=False).encode("utf-8")
-
         import_type = "truncateadd" if i == 0 else "append"
-
         _zoho_import_chunk(csv_bytes, import_type, access_token)
-
         print(
             f"✔ Uploaded "
             f"{min(i + len(chunk), total_rows):,}"
             f"/{total_rows:,}"
         )
-
     print("✅ Zoho Upload Complete")
 
 
@@ -283,12 +248,11 @@ def zoho_truncate_add(df, access_token):
 # MAIN
 # ==========================================================
 def main():
-
     authenticate()
-
     df_company = fetch_companies()
     df_device = fetch_devices()
     df_reseller = fetch_resellers()
+    df_group = fetch_groups()
 
     # ------------------------------------------------------
     # Guarantee device fields referenced below exist
@@ -300,7 +264,8 @@ def main():
             "Serial", "GlobalstarESN", "SmartwitnessDRID",   # coalesce sources
             "Name", "SurfEdgeSerial", "UpdateDate",          # new report fields
             "BillingTag", "CreationDate",
-            "BillingSKU", "BillingSKUId","Type"                                    # new
+            "BillingSKU", "BillingSKUId", "Type",
+            "Odometer", "EngineHours", "GroupId",            # new (odometer/engine hours/group)
         ],
         "Device",
     )
@@ -324,12 +289,10 @@ def main():
         "DeviceStatus__IsSuspend",
         "DeviceStatus__IsSuspended",
     ]
-
     existing_cols = [
         c for c in suspend_cols
         if c in df_device.columns
     ]
-
     if existing_cols:
         df_device["IsSuspend_device"] = (
             df_device[existing_cols]
@@ -360,6 +323,9 @@ def main():
     #     under their raw API names (only "Name" is
     #     disambiguated -> "Device_Name" to avoid clashing
     #     with the Company / Reseller name columns).
+    #   - Odometer / EngineHours / GroupId appended at the end
+    #     (raw API names; EngineHours renamed below, GroupId
+    #     stays raw for the Group_Name join).
     # ------------------------------------------------------
     df_device_clean = df_device[[
         # ----- existing -----
@@ -385,7 +351,11 @@ def main():
         "BillingTag",        # Billing Plan (report definition)
         "CreationDate",      # Date Created
         "BillingSKU",        # BillingSKU
-        "BillingSKUId"     # BillingSKUID    # Promo code
+        "BillingSKUId",      # BillingSKUID / Promo code
+        # ----- new -----
+        "Odometer",
+        "EngineHours",
+        "GroupId",
     ]].copy()
 
     df_device_clean.rename(
@@ -405,6 +375,8 @@ def main():
             # ----- only disambiguation for the new field -----
             "Name": "Device_Name",
             "BillingTag": "Billing_Plan",
+            # ----- new -----
+            "EngineHours": "Engine_Hours",
         },
         inplace=True
     )
@@ -415,7 +387,6 @@ def main():
     #   (raw, kept for the reseller join).
     # ------------------------------------------------------
     company_cols = ["Id", "ZohoAccountId"]
-
     if "Status" in df_company.columns:
         company_cols.append("Status")
     else:
@@ -434,7 +405,6 @@ def main():
         print("⚠️  'ResellerId' not found in Company data — Reseller_Name will be blank")
 
     df_company_clean = df_company[company_cols].copy()
-
     df_company_clean.rename(
         columns={
             "Id": "CompanyId",
@@ -445,7 +415,6 @@ def main():
         },
         inplace=True
     )
-
     if not has_company_name:
         df_company_clean["Company_Name"] = ""
 
@@ -463,6 +432,19 @@ def main():
     )
 
     # ------------------------------------------------------
+    # GROUP COLUMNS
+    # ------------------------------------------------------
+    df_group = ensure_columns(df_group, ["Id", "Name"], "Group")
+    df_group_clean = df_group[["Id", "Name"]].copy()
+    df_group_clean.rename(
+        columns={
+            "Id": "GroupId",
+            "Name": "Group_Name",
+        },
+        inplace=True
+    )
+
+    # ------------------------------------------------------
     # LAST ACTIVE (existing logic)
     # ------------------------------------------------------
     df_device_clean["Last_active"] = (
@@ -472,9 +454,7 @@ def main():
             utc=True
         )
     )
-
     current_time = pd.Timestamp.utcnow()
-
     df_device_clean["sending_data"] = (
         df_device_clean["Last_active"]
         .apply(
@@ -487,7 +467,8 @@ def main():
     )
 
     # ------------------------------------------------------
-    # MERGE — Company via CompanyId, then Reseller via ResellerId
+    # MERGE — Company via CompanyId, then Reseller via ResellerId,
+    # then Group via GroupId
     # ------------------------------------------------------
     Final_df = df_device_clean.merge(
         df_company_clean,
@@ -506,6 +487,13 @@ def main():
     else:
         Final_df["Reseller_Name"] = ""
 
+    Final_df = Final_df.merge(
+        df_group_clean,
+        on="GroupId",
+        how="left",
+        suffixes=("", "_group")
+    )
+
     print(f"\n🎯 Final Rows: {len(Final_df):,}")
 
     # ------------------------------------------------------
@@ -523,7 +511,6 @@ def main():
             else ""
         )
     )
-
     Final_df["Last_active"] = (
         Final_df["Last_active"]
         .dt.tz_localize(None)
@@ -546,7 +533,6 @@ def main():
     # ------------------------------------------------------
     access_token = zoho_get_access_token()
     zoho_truncate_add(Final_df, access_token)
-
     print(f"\n🚀 Uploaded {len(Final_df):,} rows to Zoho Analytics")
 
 
