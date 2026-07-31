@@ -341,12 +341,56 @@ def main():
     )
 
     # ------------------------------------------------------
+    # DEVICE STATUS (human-readable status label pulled from
+    # the device's nested DeviceStatus object — the same object
+    # that IsSuspend/IsSuspended above already comes from).
+    #
+    # NOTE: pd.json_normalize(sep="__") flattens nested keys as
+    # "DeviceStatus__<subfield>". The exact subfield name (Status,
+    # StatusName, Name, Description, etc.) depends on your API's
+    # actual response shape, which we don't have visibility into
+    # here. The candidates below cover the common patterns and are
+    # checked in order (first match wins per row via bfill). If
+    # Device_Status prints as blank for all rows, open one raw
+    # device record's "DeviceStatus" object and add/adjust the
+    # real key name in devicestatus_cols.
+    # ------------------------------------------------------
+    devicestatus_cols = [
+        "DeviceStatus__Status",
+        "DeviceStatus__StatusName",
+        "DeviceStatus__Name",
+        "DeviceStatus__Description",
+        "DeviceStatus",
+    ]
+    existing_status_cols = [
+        c for c in devicestatus_cols
+        if c in df_device.columns
+    ]
+    if existing_status_cols:
+        df_device["Device_Status"] = (
+            df_device[existing_status_cols]
+            .astype(str)
+            .replace("nan", None)
+            .bfill(axis=1)
+            .iloc[:, 0]
+        )
+    else:
+        df_device["Device_Status"] = None
+        print(
+            "⚠️  DeviceStatus field not found under any expected name "
+            f"{devicestatus_cols} — Device_Status will be blank. "
+            "Check a raw Device/GetAll record for the real field name "
+            "and update devicestatus_cols."
+        )
+
+    # ------------------------------------------------------
     # DEVICE COLUMNS
     #   - Existing columns keep their existing names.
     #   - BillingTag -> Billing_Plan   (renamed below)
     #   - HWSKU      -> BillingSKU      (renamed below)
     #   - Only "Name" is disambiguated -> "Device_Name".
     #   - Odometer / EngineHours / GroupId appended at the end.
+    #   - Device_Status (new) sits alongside Is_Suspended.
     # ------------------------------------------------------
     df_device_clean = df_device[[
         # ----- existing -----
@@ -363,6 +407,7 @@ def main():
         "LastCameraContact",
         "TerminationDate",
         "IsSuspend_device",
+        "Device_Status",     # NEW
         # ----- additional (finance report) -----
         "Name",              # Device Name
         "Serial",            # SM Serial
@@ -529,6 +574,10 @@ def main():
     # Debug: confirm Status values look correct
     if "Status" in Final_df.columns:
         print(f"\n📊 Status value counts:\n{Final_df['Status'].value_counts()}")
+
+    # Debug: confirm Device_Status values look correct
+    if "Device_Status" in Final_df.columns:
+        print(f"\n📊 Device_Status value counts:\n{Final_df['Device_Status'].value_counts()}")
 
     # ------------------------------------------------------
     # LOAD -> ZOHO ANALYTICS (truncate + chunked append)
