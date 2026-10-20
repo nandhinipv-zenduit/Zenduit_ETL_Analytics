@@ -3,6 +3,9 @@ import json
 import requests
 import pandas as pd
 
+# >>> NEW (1/3): internal CRM lookup add-on (internal_crm_lookup.py next to this file)
+from internal_crm_lookup import load_internal_mapping, attach_internal_crm
+
 # ==========================================================
 # ZENDUIT CONFIG
 # ==========================================================
@@ -355,6 +358,17 @@ def zoho_truncate_add(df, access_token):
 # MAIN
 # ==========================================================
 def main():
+    # >>> NEW (2/3): load the internal CRM mapping from Zoho FIRST.
+    # If it can't be read or looks wrong this raises and the run stops
+    # before anything is uploaded, so the Zenduit Devices table keeps
+    # yesterday's data instead of getting blank internal columns.
+    mapping = load_internal_mapping(
+        ZOHO_ANALYTICS["api_domain"],
+        ZOHO_WORKSPACE_ID,
+        ZOHO_ORG_ID,
+        zoho_get_access_token(),
+    )
+
     authenticate()
 
     df_company = fetch_companies()
@@ -710,6 +724,10 @@ def main():
         Final_df["Reseller_Name"] = ""
 
     print(f"\n🎯 Final Rows: {len(Final_df):,}")
+
+    # >>> NEW (3/3): add Internal_crm_account_id, Internal_account_name,
+    # Internal_mapping_source by Device_Id (existing columns untouched)
+    Final_df = attach_internal_crm(Final_df, mapping)
 
     # ------------------------------------------------------
     # CLEANUP
