@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import requests
 import pandas as pd
@@ -496,6 +497,23 @@ def main():
     # treats "" as missing and also falls back to the third-party
     # telematics serial.
     # ------------------------------------------------------
+    # ------------------------------------------------------
+    # TELTONIKA / IMEI FALLBACK
+    # None of the five fields above is filled for Teltonika
+    # trackers, so ~90% of Teltonika rows imported a blank
+    # serial_number (e.g. Premiere Industrial Solutions / Suri
+    # Trading "GAH 416"). Their identifier is the IMEI, which
+    # lives in a field this script never read. Pick up any
+    # device field whose name contains "imei" (top-level or
+    # nested, e.g. "Imei", "IMEI", "Tracker__Imei") and use it
+    # as the last fallback.
+    # ------------------------------------------------------
+    imei_cols = [
+        c for c in df_device.columns
+        if re.search(r"imei", c, re.IGNORECASE)
+    ]
+    print(f"📟 IMEI-like device fields found: {imei_cols or 'NONE'}")
+
     df_device["serial_number"] = coalesce(
         df_device,
         [
@@ -504,8 +522,41 @@ def main():
             "SmartwitnessDRID",
             "SurfEdgeSerial",
             "GeotabCustomDevice",
+            *imei_cols,
         ],
     )
+
+    # ---- diagnostic: blank serials by tracker type ----
+    blank_mask = df_device["serial_number"].isna()
+    if blank_mask.any() and "Type" in df_device.columns:
+        print(
+            "📊 Still-blank serial_number by Type:\n"
+            f"{df_device.loc[blank_mask, 'Type'].value_counts().head(15)}"
+        )
+        # If no IMEI field was found, show which fields a blank
+        # Teltonika row DOES carry, and which hold a 15-digit
+        # (IMEI-shaped) value, so the right field can be added
+        # to the coalesce list above.
+        tel_blank = df_device[
+            blank_mask
+            & (df_device["Type"].astype(str).str.lower() == "teltonika")
+        ]
+        if len(tel_blank):
+            sample = tel_blank.iloc[0]
+            filled = [
+                k for k, v in sample.items()
+                if not isinstance(v, (list, dict))
+                and pd.notna(v) and str(v).strip() not in ("", "None", "null")
+            ]
+            imei_shaped = [
+                k for k in filled
+                if re.fullmatch(r"\d{15}", str(sample[k]).strip())
+            ]
+            print(
+                f"🔍 Sample blank Teltonika device {sample.get('Name')!r}: "
+                f"populated fields = {filled}"
+            )
+            print(f"🔍 Fields holding a 15-digit (IMEI-shaped) value: {imei_shaped or 'NONE'}")
 
     blank_serials = df_device["serial_number"].isna().sum()
     print(
