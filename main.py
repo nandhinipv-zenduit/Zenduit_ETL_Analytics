@@ -505,12 +505,12 @@ def main():
     # Trading "GAH 416"). Their identifier is the IMEI, which
     # lives in a field this script never read. Pick up any
     # device field whose name contains "imei" (top-level or
-    # nested, e.g. "Imei", "IMEI", "Tracker__Imei") and use it
+    # nested, e.g. "IMEI", or the API's misspelt "IMIE" which Teltonika uses) and use it
     # as the last fallback.
     # ------------------------------------------------------
     imei_cols = [
         c for c in df_device.columns
-        if re.search(r"imei", c, re.IGNORECASE)
+        if re.search(r"imei|imie", c, re.IGNORECASE)
     ]
     print(f"📟 IMEI-like device fields found: {imei_cols or 'NONE'}")
 
